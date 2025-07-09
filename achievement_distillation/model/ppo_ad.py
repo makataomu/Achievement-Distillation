@@ -71,6 +71,10 @@ class PPOADModel(PPOModel):
             dense_init_norm_kwargs=dense_init_norm_kwargs,
         )
 
+    @property
+    def device(self):
+        return next(self.parameters()).device
+
     def forward(self, obs: th.Tensor, states: th.Tensor) -> Dict[str, th.Tensor]:
         # Pass through encoder
         latents = self.encode(obs)
