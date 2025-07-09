@@ -391,6 +391,8 @@ class PPOADAlgorithm(BaseAlgorithm):
         super().__init__(model)
         self.model: PPOADModel
 
+        self.lr = lr
+
         # PPO params
         self.ppo_nepoch = ppo_nepoch
         self.ppo_nbatch = ppo_nbatch
@@ -566,8 +568,6 @@ class PPOADAlgorithm(BaseAlgorithm):
         return train_stats
     
     def reinit_optimizers(self):
-        lr = self.optimizer.defaults["lr"]
-        self.optimizer = th.optim.Adam(self.model.parameters(), lr=lr)
-        self.match_optimizer = th.optim.Adam(self.model.parameters(), lr=lr)
-        self.pred_optimizer = th.optim.Adam(self.model.parameters(), lr=lr)
-
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        self.match_optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        self.pred_optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
