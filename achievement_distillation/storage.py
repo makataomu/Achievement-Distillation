@@ -159,6 +159,7 @@ class RolloutStorage:
                 "advs": advs[indices],
             }
             yield batch
+            
     def to_(self, device: th.device):
         self.device = device
         for attr, value in self.__dict__.items():

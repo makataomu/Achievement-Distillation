@@ -14,3 +14,6 @@ class BaseAlgorithm(abc.ABC):
     @abc.abstractclassmethod
     def update(self, storage: RolloutStorage) -> Dict[str, th.Tensor]:
         pass
+    
+    def to(self, device: th.device):
+        self.model = self.model.to(device)

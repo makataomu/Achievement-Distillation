@@ -134,9 +134,22 @@ def main(args):
         if (epoch - 1) % 4 == 0:
             device = device1 if device == device0 else device0
             print(f"\n🔁 Switching to device: {device}")
+
+            algorithm.optimizer.zero_grad(set_to_none=True)
+            algorithm.match_optimizer.zero_grad(set_to_none=True)
+            algorithm.pred_optimizer.zero_grad(set_to_none=True)
+
+            # Step 2: Delete old optimizer objects to clear internal state
+            del algorithm.optimizer
+            del algorithm.match_optimizer
+            del algorithm.pred_optimizer
+            th.cuda.empty_cache()
+
             model = model.to(device)
             venv = VecPyTorch(venv.venv, device=device)  # Re-wrap only underlying env
             storage.to_(device)
+            algorithm.model = model
+            algorithm.reinit_optimizers()
 
         # Sample episodes
         rollout_stats = sample_rollouts(venv, model, storage)

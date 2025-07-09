@@ -564,3 +564,10 @@ class PPOADAlgorithm(BaseAlgorithm):
             train_stats.update(aux_train_stats)
 
         return train_stats
+    
+    def reinit_optimizers(self):
+        lr = self.optimizer.defaults["lr"]
+        self.optimizer = th.optim.Adam(self.model.parameters(), lr=lr)
+        self.match_optimizer = th.optim.Adam(self.model.parameters(), lr=lr)
+        self.pred_optimizer = th.optim.Adam(self.model.parameters(), lr=lr)
+
