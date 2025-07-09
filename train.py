@@ -24,6 +24,8 @@ from achievement_distillation.storage import RolloutStorage
 from achievement_distillation.wrapper import VecPyTorch
 
 
+th.cuda.memory._set_allocator_settings("max_split_size_mb:32")
+
 def main(args):
     # Load config file
     config_file = open(f"configs/{args.exp_name}.yaml", "r")
