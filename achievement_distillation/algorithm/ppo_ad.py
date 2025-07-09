@@ -377,7 +377,8 @@ class FrozenModelCPU(nn.Module):
     def __init__(self, model: nn.Module):
         super().__init__()
         # deep copy and immediately move to CPU
-        self.model = copy.deepcopy(model).cpu().eval()
+        self.model = copy.deepcopy(model).to(model.device).eval()
+        # self.model = copy.deepcopy(model).to(model.device).half().eval()
         # no gradients needed
         for p in self.model.parameters():
             p.requires_grad = False
