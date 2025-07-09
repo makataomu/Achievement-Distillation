@@ -33,6 +33,14 @@ class DataParallelPassthrough(th.nn.DataParallel):
         except AttributeError:
             return getattr(self.module, name)
 
+    # These methods must be forwarded manually:
+    def act(self, *args, **kwargs):
+        return self.module.act(*args, **kwargs)
+
+    def compute_losses(self, *args, **kwargs):
+        return self.module.compute_losses(*args, **kwargs)
+
+
 
 def main(args):
     # Load config file
