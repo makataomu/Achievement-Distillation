@@ -541,6 +541,9 @@ class PPOADAlgorithm(BaseAlgorithm):
                     clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                     self.match_optimizer.step()
 
+                    del batch, loss, match_losses
+                    th.cuda.empty_cache()
+
                     # Update stats
                     match_loss_epoch += match_loss.item()
                     pi_dist_epoch += pi_dist.item()
@@ -573,6 +576,9 @@ class PPOADAlgorithm(BaseAlgorithm):
                     loss.backward()
                     clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                     self.pred_optimizer.step()
+
+                    del batch, loss, match_losses
+                    th.cuda.empty_cache()
 
                     # Update stats
                     pred_loss_epoch += pred_loss.item()
