@@ -557,7 +557,7 @@ class PPOADAlgorithm(BaseAlgorithm):
                 # Get pred data loader
                 pred_data_loader = self.buffer.get_pred_data_loader()
 
-                batch = loss = match_losses = None
+                batch = loss = pred_losses = None
                 for batch in pred_data_loader:
                     batch = {k: v.to(self.model.device) for k, v in batch.items()}
                     # Now you can safely use it on the model
@@ -582,7 +582,7 @@ class PPOADAlgorithm(BaseAlgorithm):
                     clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                     self.pred_optimizer.step()
 
-                    del batch, loss, match_losses
+                    del batch, loss, pred_losses
                     th.cuda.empty_cache()
 
                     # Update stats
