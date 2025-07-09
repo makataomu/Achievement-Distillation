@@ -296,8 +296,8 @@ class Buffer:
 
                 # Compute target states
                 with th.no_grad():
-                    goal_obs_t = goal_obs_t
-                    goal_next_obs_t = goal_next_obs_t
+                    goal_obs_t = goal_obs_t.to(model.device)
+                    goal_next_obs_t = goal_next_obs_t.to(model.device)
                     states_t = model.get_states(goal_obs_t, goal_next_obs_t)
 
                 # Match source and target goals
@@ -370,6 +370,27 @@ class Buffer:
                     "old_vtargs": old_vtargs[inds],
                 }
                 yield batch
+
+
+import torch.nn as nn
+class FrozenModelCPU(nn.Module):
+    def __init__(self, model: nn.Module):
+        super().__init__()
+        # deep copy and immediately move to CPU
+        self.model = copy.deepcopy(model).cpu().eval()
+        # no gradients needed
+        for p in self.model.parameters():
+            p.requires_grad = False
+
+    def forward(self, *args, **kwargs):
+        with th.inference_mode():
+            return self.model(*args, **kwargs)
+
+    # expose act / get_states if needed
+    def act(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
+    def get_states(self, *args, **kwargs):
+        return self.model.get_states(*args, **kwargs)
 
 
 class PPOADAlgorithm(BaseAlgorithm):
@@ -476,7 +497,8 @@ class PPOADAlgorithm(BaseAlgorithm):
             self.buffer.preprocess_trajs()
 
             # Copy model and set it to eval mode
-            old_model = copy.deepcopy(self.model)
+            old_model = FrozenModelCPU(self.model)
+            th.cuda.empty_cache()
             old_model.eval()
 
             # Run aux phase
