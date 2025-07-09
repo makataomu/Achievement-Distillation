@@ -516,6 +516,7 @@ class PPOADAlgorithm(BaseAlgorithm):
             match_nupdate = 0
             pred_nupdate = 0
 
+            batch = loss = match_losses = None
             for _ in range(self.aux_nepoch):
                 # Get match data loader
                 match_data_loader = self.buffer.get_match_data_loader(self.model)
@@ -556,6 +557,7 @@ class PPOADAlgorithm(BaseAlgorithm):
                 # Get pred data loader
                 pred_data_loader = self.buffer.get_pred_data_loader()
 
+                batch = loss = match_losses = None
                 for batch in pred_data_loader:
                     batch = {k: v.to(self.model.device) for k, v in batch.items()}
                     # Now you can safely use it on the model
