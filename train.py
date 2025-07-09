@@ -59,6 +59,13 @@ def main(args):
     cuda = th.cuda.is_available()
     device = th.device("cuda:0" if cuda else "cpu")
 
+    cuda = th.cuda.is_available()
+    if cuda:
+        device0 = th.device("cuda:0")
+        device1 = th.device("cuda:1") if th.cuda.device_count() > 1 else th.device("cuda:0")
+
+        device = device0  # Default at start
+
     # Create logger
     group_name = f"{args.exp_name}-{args.timestamp}"
     run_name = f"{group_name}-s{args.seed:02}"
@@ -106,9 +113,9 @@ def main(args):
     )
 
     # Parallelize if multiple GPUs
-    if th.cuda.device_count() > 1:
-        print("Using", th.cuda.device_count(), "GPUs")
-        model = DataParallelPassthrough(model)
+    # if th.cuda.device_count() > 1:
+    #     print("Using", th.cuda.device_count(), "GPUs")
+    #     model = DataParallelPassthrough(model)
 
     model = model.to(device)
     print(model)
@@ -124,6 +131,13 @@ def main(args):
     total_successes = np.zeros((0, len(TASKS)), dtype=np.int32)
 
     for epoch in range(1, config["nepoch"] + 1):
+        if (epoch - 1) % 4 == 0:
+            current_device = device1 if current_device == device0 else device0
+            print(f"\n🔁 Switching to device: {current_device}")
+            model = model.to(current_device)
+            venv = VecPyTorch(venv.venv, device=current_device)  # Re-wrap only underlying env
+            storage.to_(current_device)
+
         # Sample episodes
         rollout_stats = sample_rollouts(venv, model, storage)
 
