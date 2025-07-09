@@ -132,11 +132,11 @@ def main(args):
 
     for epoch in range(1, config["nepoch"] + 1):
         if (epoch - 1) % 4 == 0:
-            current_device = device1 if current_device == device0 else device0
-            print(f"\n🔁 Switching to device: {current_device}")
-            model = model.to(current_device)
-            venv = VecPyTorch(venv.venv, device=current_device)  # Re-wrap only underlying env
-            storage.to_(current_device)
+            device = device1 if device == device0 else device0
+            print(f"\n🔁 Switching to device: {device}")
+            model = model.to(device)
+            venv = VecPyTorch(venv.venv, device=device)  # Re-wrap only underlying env
+            storage.to_(device)
 
         # Sample episodes
         rollout_stats = sample_rollouts(venv, model, storage)
