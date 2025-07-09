@@ -202,6 +202,7 @@ class PPOADModel(PPOModel):
         neg_old_pi_logits = neg_old_outputs["pi_logits"]
         pi_logits = th.cat([pos_pi_logits, neg_pi_logits], dim=0)
         old_pi_logits = th.cat([pos_old_pi_logits, neg_old_pi_logits], dim=0)
+        old_pi_logits = old_pi_logits.to(pi_logits.device)
         pi_dist = self.pi_head.kl_divergence(pi_logits, old_pi_logits).mean()
 
         # Compute value dist
@@ -209,6 +210,7 @@ class PPOADModel(PPOModel):
         neg_vpreds = neg_outputs["vpreds"]
         vpreds = th.cat([pos_vpreds, neg_vpreds], dim=0)
         old_vtargs = th.cat([pos_old_vtargs, neg_old_vtargs], dim=0)
+        old_vtargs = old_vtargs.to(vpreds.device)
         vf_dist = self.vf_head.mse_loss(vpreds, old_vtargs).mean()
 
         # Define pred losses
@@ -259,10 +261,12 @@ class PPOADModel(PPOModel):
         # Compute policy dist
         pi_logits = outputs["pi_logits"]
         old_pi_logits = old_outputs["pi_logits"]
+        old_pi_logits = old_pi_logits.to(pi_logits.device)
         pi_dist = self.pi_head.kl_divergence(pi_logits, old_pi_logits).mean()
 
         # Compute value dist
         vpreds = outputs["vpreds"]
+        old_vtargs = old_vtargs.to(vpreds.device)
         vf_dist = self.vf_head.mse_loss(vpreds, old_vtargs).mean()
 
         # Define match losses
