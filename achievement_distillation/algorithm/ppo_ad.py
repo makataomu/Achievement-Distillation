@@ -233,18 +233,18 @@ class Buffer:
             for inds in sampler:
                 batch = {
                     # Anchor
-                    "anc_goal_obs": anc_goal_obs[inds].cuda(),
-                    "anc_goal_next_obs": anc_goal_next_obs[inds].cuda(),
+                    "anc_goal_obs": anc_goal_obs[inds],
+                    "anc_goal_next_obs": anc_goal_next_obs[inds],
                     # Positive
-                    "pos_obs": pos_obs[inds].cuda(),
-                    "pos_actions": pos_actions[inds].cuda(),
-                    "pos_old_states": pos_old_states[inds].cuda(),
-                    "pos_old_vtargs": pos_old_vtargs[inds].cuda(),
+                    "pos_obs": pos_obs[inds],
+                    "pos_actions": pos_actions[inds],
+                    "pos_old_states": pos_old_states[inds],
+                    "pos_old_vtargs": pos_old_vtargs[inds],
                     # Negative
-                    "neg_obs": neg_obs[inds].cuda(),
-                    "neg_actions": neg_actions[inds].cuda(),
-                    "neg_old_states": neg_old_states[inds].cuda(),
-                    "neg_old_vtargs": neg_old_vtargs[inds].cuda(),
+                    "neg_obs": neg_obs[inds],
+                    "neg_actions": neg_actions[inds],
+                    "neg_old_states": neg_old_states[inds],
+                    "neg_old_vtargs": neg_old_vtargs[inds],
                 }
                 yield batch
 
@@ -270,8 +270,8 @@ class Buffer:
 
             # Compute source states
             with th.no_grad():
-                goal_obs_s = goal_obs_s.cuda()
-                goal_next_obs_s = goal_next_obs_s.cuda()
+                goal_obs_s = goal_obs_s.to(model.device)
+                goal_next_obs_s = goal_next_obs_s.to(model.device)
                 states_s = model.get_states(goal_obs_s, goal_next_obs_s)
 
             # Sample target trajectories
@@ -296,8 +296,8 @@ class Buffer:
 
                 # Compute target states
                 with th.no_grad():
-                    goal_obs_t = goal_obs_t.cuda()
-                    goal_next_obs_t = goal_next_obs_t.cuda()
+                    goal_obs_t = goal_obs_t
+                    goal_next_obs_t = goal_next_obs_t
                     states_t = model.get_states(goal_obs_t, goal_next_obs_t)
 
                 # Match source and target goals
@@ -356,18 +356,18 @@ class Buffer:
             for inds in sampler:
                 batch = {
                     # Anchor
-                    "anc_goal_obs": anc_goal_obs[inds].cuda(),
-                    "anc_goal_next_obs": anc_goal_next_obs[inds].cuda(),
+                    "anc_goal_obs": anc_goal_obs[inds],
+                    "anc_goal_next_obs": anc_goal_next_obs[inds],
                     # Positive
-                    "pos_goal_obs": pos_goal_obs[inds].cuda(),
-                    "pos_goal_next_obs": pos_goal_next_obs[inds].cuda(),
+                    "pos_goal_obs": pos_goal_obs[inds],
+                    "pos_goal_next_obs": pos_goal_next_obs[inds],
                     # Negative
-                    "neg_goal_obs": neg_goal_obs[inds].cuda(),
-                    "neg_goal_next_obs": neg_goal_next_obs[inds].cuda(),
+                    "neg_goal_obs": neg_goal_obs[inds],
+                    "neg_goal_next_obs": neg_goal_next_obs[inds],
                     # Misc
-                    "obs": obs[inds].cuda(),
-                    "old_states": old_states[inds].cuda(),
-                    "old_vtargs": old_vtargs[inds].cuda(),
+                    "obs": obs[inds],
+                    "old_states": old_states[inds],
+                    "old_vtargs": old_vtargs[inds],
                 }
                 yield batch
 
@@ -492,6 +492,9 @@ class PPOADAlgorithm(BaseAlgorithm):
                 match_data_loader = self.buffer.get_match_data_loader(self.model)
 
                 for batch in match_data_loader:
+                    batch = {k: v.to(self.model.device) for k, v in batch.items()}
+                    # Now you can safely use it on the model
+
                     # Compute match loss
                     match_losses = self.model.compute_match_losses(
                         **batch,
@@ -522,6 +525,9 @@ class PPOADAlgorithm(BaseAlgorithm):
                 pred_data_loader = self.buffer.get_pred_data_loader()
 
                 for batch in pred_data_loader:
+                    batch = {k: v.to(self.model.device) for k, v in batch.items()}
+                    # Now you can safely use it on the model
+
                     # Compute pred loss
                     pred_losses = self.model.compute_pred_losses(
                         **batch,
