@@ -26,6 +26,14 @@ from achievement_distillation.wrapper import VecPyTorch
 
 th.cuda.memory._set_allocator_settings("max_split_size_mb:32")
 
+class DataParallelPassthrough(th.nn.DataParallel):
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.module, name)
+
+
 def main(args):
     # Load config file
     config_file = open(f"configs/{args.exp_name}.yaml", "r")
@@ -92,7 +100,7 @@ def main(args):
     # Parallelize if multiple GPUs
     if th.cuda.device_count() > 1:
         print("Using", th.cuda.device_count(), "GPUs")
-        model = nn.DataParallel(model)
+        model = DataParallelPassthrough(model)
 
     model = model.to(device)
     print(model)
