@@ -19,6 +19,7 @@ class Buffer:
     def __init__(self, maxlen: int, max_batch_size: int):
         self.segs: List[Dict[str, th.Tensor]] = deque(maxlen=maxlen)
         self.trajs: List[Dict[str, th.Tensor]] = []
+        self.max_batch_size = max_batch_size
 
     def __len__(self):
         return len(self.segs)
