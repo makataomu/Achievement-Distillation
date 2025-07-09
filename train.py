@@ -108,6 +108,8 @@ def main(args):
         # Update models
         train_stats = algorithm.update(storage)
 
+        th.cuda.empty_cache()
+
         # Reset storage
         storage.reset()
 
