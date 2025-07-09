@@ -16,7 +16,7 @@ from achievement_distillation.storage import RolloutStorage
 
 
 class Buffer:
-    def __init__(self, maxlen: int):
+    def __init__(self, maxlen: int, max_batch_size: int):
         self.segs: List[Dict[str, th.Tensor]] = deque(maxlen=maxlen)
         self.trajs: List[Dict[str, th.Tensor]] = []
 
@@ -176,7 +176,7 @@ class Buffer:
 
     def get_pred_data_loader(
         self,
-        max_batch_size: int = 512,
+        # max_batch_size: int = 512,
     ) -> Iterator[Dict[str, th.Tensor]]:
         # Loop over trajectories
         ntraj = len(self.trajs)
@@ -227,7 +227,7 @@ class Buffer:
 
             # Get sampler
             sampler = SubsetRandomSampler(range(ndata))
-            sampler = BatchSampler(sampler, batch_size=max_batch_size, drop_last=False)
+            sampler = BatchSampler(sampler, batch_size=self.max_batch_size, drop_last=False)
 
             # Sample batch
             for inds in sampler:
@@ -251,7 +251,7 @@ class Buffer:
     def get_match_data_loader(
         self,
         model: PPOADModel,
-        max_batch_size: int = 512,
+        # max_batch_size: int = 512,
     ) -> Iterator[Dict[str, th.Tensor]]:
         # Filter trajectories
         trajs = [traj for traj in self.trajs if len(traj["goal_steps"]) > 0]
@@ -344,7 +344,7 @@ class Buffer:
             # Get sampler
             ndata = len(anc_goal_obs)
             sampler = SubsetRandomSampler(range(ndata))
-            sampler = BatchSampler(sampler, batch_size=max_batch_size, drop_last=False)
+            sampler = BatchSampler(sampler, batch_size=self.max_batch_size, drop_last=False)
 
             # Get misc
             rand_inds = th.randint(len(obs_s), (ndata,))
@@ -412,6 +412,7 @@ class PPOADAlgorithm(BaseAlgorithm):
         aux_nepoch: int,
         pi_dist_coef: int,
         vf_dist_coef: int,
+        max_batch_size: int,
     ):
         super().__init__(model)
         self.model: PPOADModel
@@ -434,7 +435,8 @@ class PPOADAlgorithm(BaseAlgorithm):
         self.vf_dist_coef = vf_dist_coef
 
         # Buffer
-        self.buffer = Buffer(maxlen=aux_freq)
+        self.max_batch_size = max_batch_size
+        self.buffer = Buffer(maxlen=aux_freq, max_batch_size=self.max_batch_size)
 
         # Optimizers
         self.optimizer = optim.Adam(model.parameters(), lr=lr)
