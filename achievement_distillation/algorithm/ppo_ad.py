@@ -376,22 +376,25 @@ import torch.nn as nn
 class FrozenModelCPU(nn.Module):
     def __init__(self, model: nn.Module):
         super().__init__()
-        # deep copy and immediately move to CPU
-        self.model = copy.deepcopy(model).to(model.device).eval()
-        # self.model = copy.deepcopy(model).to(model.device).half().eval()
-        # no gradients needed
+        # Deep copy and move to CPU
+        self.model = copy.deepcopy(model).cpu().eval()
         for p in self.model.parameters():
             p.requires_grad = False
 
     def forward(self, *args, **kwargs):
-        with th.inference_mode():
+        args = [arg.cpu() if isinstance(arg, th.Tensor) else arg for arg in args]
+        kwargs = {k: v.cpu() if isinstance(v, th.Tensor) else v for k, v in kwargs.items()}
+        with th.no_grad():
             return self.model(*args, **kwargs)
 
-    # expose act / get_states if needed
     def act(self, *args, **kwargs):
         return self.forward(*args, **kwargs)
+
     def get_states(self, *args, **kwargs):
-        return self.model.get_states(*args, **kwargs)
+        args = [arg.cpu() if isinstance(arg, th.Tensor) else arg for arg in args]
+        kwargs = {k: v.cpu() if isinstance(v, th.Tensor) else v for k, v in kwargs.items()}
+        with th.no_grad():
+            return self.model.get_states(*args, **kwargs)
 
 
 class PPOADAlgorithm(BaseAlgorithm):
