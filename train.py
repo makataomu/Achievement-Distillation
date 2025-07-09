@@ -9,6 +9,7 @@ import yaml
 
 import numpy as np
 import torch as th
+import torch.nn as nn
 
 from crafter.env import Env
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
@@ -85,6 +86,12 @@ def main(args):
         action_space=venv.action_space,
         **config["model_kwargs"],
     )
+
+    # Parallelize if multiple GPUs
+    if th.cuda.device_count() > 1:
+        print("Using", th.cuda.device_count(), "GPUs")
+        model = nn.DataParallel(model)
+
     model = model.to(device)
     print(model)
 
