@@ -6,6 +6,7 @@ import os
 import random
 import sys
 import yaml
+import pprint
 
 import numpy as np
 import torch as th
@@ -25,22 +26,6 @@ from achievement_distillation.wrapper import VecPyTorch
 
 
 th.cuda.memory._set_allocator_settings("max_split_size_mb:32")
-
-class DataParallelPassthrough(th.nn.DataParallel):
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            return getattr(self.module, name)
-
-    # These methods must be forwarded manually:
-    def act(self, *args, **kwargs):
-        return self.module.act(*args, **kwargs)
-
-    def compute_losses(self, *args, **kwargs):
-        return self.module.compute_losses(*args, **kwargs)
-
-
 
 def main(args):
     # Load config file
@@ -112,11 +97,6 @@ def main(args):
         **config["model_kwargs"],
     )
 
-    # Parallelize if multiple GPUs
-    # if th.cuda.device_count() > 1:
-    #     print("Using", th.cuda.device_count(), "GPUs")
-    #     model = DataParallelPassthrough(model)
-
     model = model.to(device)
     print(model)
 
@@ -127,30 +107,18 @@ def main(args):
         **config["algorithm_kwargs"],
     )
 
+    print("-------------------CONFIG----------------------")
+    try:
+        print(json.dumps(config, indent=2))
+    except TypeError:
+        print("[WARNING] json.dumps failed, using pprint instead.")
+        pprint.pprint(config)
+    print("-------------------CONFIG DONE----------------------")
+
     # Run algorithm
     total_successes = np.zeros((0, len(TASKS)), dtype=np.int32)
 
     for epoch in range(1, config["nepoch"] + 1):
-        # if (epoch - 1) % 4 == 0:
-        #     device = device1 if device == device0 else device0
-        #     print(f"\n🔁 Switching to device: {device}")
-
-        #     algorithm.optimizer.zero_grad(set_to_none=True)
-        #     algorithm.match_optimizer.zero_grad(set_to_none=True)
-        #     algorithm.pred_optimizer.zero_grad(set_to_none=True)
-
-        #     # Step 2: Delete old optimizer objects to clear internal state
-        #     del algorithm.optimizer
-        #     del algorithm.match_optimizer
-        #     del algorithm.pred_optimizer
-        #     th.cuda.empty_cache()
-
-        #     model = model.to(device)
-        #     venv = VecPyTorch(venv.venv, device=device)  # Re-wrap only underlying env
-        #     storage.to_(device)
-        #     algorithm.model = model
-        #     algorithm.reinit_optimizers()
-
         # Sample episodes
         rollout_stats = sample_rollouts(venv, model, storage)
 

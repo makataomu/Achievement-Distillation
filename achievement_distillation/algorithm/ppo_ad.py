@@ -1,6 +1,7 @@
 from collections import deque
 import copy
 from typing import Dict, Iterator, List, Tuple
+import time
 
 import numpy as np
 import torch as th
@@ -39,6 +40,13 @@ class Buffer:
         masks = th.cat([seg["masks"][:-1] for seg in self.segs], dim=0)
         rewards = th.cat([seg["rewards"] for seg in self.segs], dim=0)
         successes = th.cat([seg["successes"][:-1] for seg in self.segs], dim=0)
+
+        total_steps = obs.shape[0]
+        print(f"[DEBUG] Total steps in buffer: {total_steps} (across all segments)")
+
+        for i, seg in enumerate(self.segs):
+            print(f"[DEBUG] Segment {i}: obs shape {seg['obs'].shape}")
+
 
         # Sanity check (please report if assertion occurs)
         assert (
@@ -182,6 +190,8 @@ class Buffer:
         # Loop over trajectories
         ntraj = len(self.trajs)
 
+        n_skipped_due_goal = 0
+
         for i in th.randperm(ntraj):
             # Get trajectory
             traj = self.trajs[i]
@@ -195,6 +205,8 @@ class Buffer:
 
             # Continue if no goal
             if len(goal_steps) == 0:
+                n_skipped_due_goal += 1
+                print(n_skipped_due_goal, " skipped due to goal")
                 continue
 
             # Get next goals
@@ -256,9 +268,11 @@ class Buffer:
     ) -> Iterator[Dict[str, th.Tensor]]:
         # Filter trajectories
         trajs = [traj for traj in self.trajs if len(traj["goal_steps"]) > 0]
+        print(f"[DEBUG] Match loader using {len(trajs)} goal-ful trajectories")
 
         # Loop over trajectories
         ntraj = len(trajs)
+        n_skipped_due_goal = 0
 
         for i in th.randperm(ntraj):
             # Get source trajectory
@@ -285,6 +299,7 @@ class Buffer:
 
             inds = th.randperm(ntraj - 1)[:16]
 
+            n_skip_due_row = 0
             for j in inds:
                 # Avoid sampling same trajectory
                 if j >= i:
@@ -311,6 +326,8 @@ class Buffer:
 
                 # Continue if no matching
                 if len(row_inds) == 0:
+                    n_skip_due_row += 1
+                    print(n_skip_due_row, " skipped fue to to row inds 0")
                     continue
 
                 # Get anchor
@@ -328,6 +345,8 @@ class Buffer:
 
             # Continue if no matching
             if len(anc_goal_obs) == 0:
+                n_skipped_due_goal += 1
+                print(n_skipped_due_goal, " skipped due to goal")
                 continue
 
             # Concatenate anchor
@@ -498,15 +517,27 @@ class PPOADAlgorithm(BaseAlgorithm):
         # Increase PPO count
         self.ppo_count += 1
 
+        print(f"[DEBUG] Trajectories in buffer before aux training: {len(self.buffer.trajs)}")
+
         if self.ppo_count % self.aux_freq == 0:
+            print(f"[DEBUG] Starting AUX phase at PPO count {self.ppo_count}")
+            t1 = time.time()
             # Pre-process buffer
+            print(f"[DEBUG] Buffer has {len(self.buffer.segs)} segments before parse_segs.")
+            print("[DEBUG] Parsing buffer")
             self.buffer.parse_segs()
+            print("[DEBUG] Buffer parsed")
+
+            print("[DEBUG] preprocess_trajs")
             self.buffer.preprocess_trajs()
+            print("[DEBUG] preprocess_trajs done")
 
             # Copy model and set it to eval mode
+            print("[DEBUG] FrozenModelCPU")
             old_model = FrozenModelCPU(self.model)
             th.cuda.empty_cache()
             old_model.eval()
+            print("[DEBUG] FrozenModelCPU done")
 
             # Run aux phase
             match_loss_epoch = 0
@@ -518,10 +549,18 @@ class PPOADAlgorithm(BaseAlgorithm):
 
             batch = loss = match_losses = None
             for _ in range(self.aux_nepoch):
+                print("[DEBUG] Starting aux match epoch")
                 # Get match data loader
                 match_data_loader = self.buffer.get_match_data_loader(self.model)
+                print("[DEBUG] Got match data loader")
+                match_batches = list(match_data_loader)
 
-                for batch in match_data_loader:
+                print(f"[DEBUG] Match dataloader contains {len(match_batches)} batches")
+
+                for idx, batch in enumerate(match_batches):
+                # for batch in match_data_loader:
+                    print(f"[DEBUG] Match batch {idx} keys: {list(batch.keys())} shapes: {[v.shape for v in batch.values()]}")
+                    print("[DEBUG] Processing match batch")
                     batch = {k: v.to(self.model.device) for k, v in batch.items()}
                     # Now you can safely use it on the model
 
@@ -541,7 +580,17 @@ class PPOADAlgorithm(BaseAlgorithm):
 
                     # Update parameters
                     self.match_optimizer.zero_grad()
+
+                    print("[DEBUG] Before backward")
+                    th.cuda.synchronize()
+                    print(f"[DEBUG] CUDA mem alloc: {th.cuda.memory_allocated() / 1024**2:.2f} MB")
+                    print(f"[DEBUG] CUDA mem reserved: {th.cuda.memory_reserved() / 1024**2:.2f} MB")
+
                     loss.backward()
+
+                    th.cuda.synchronize()
+                    print("[DEBUG] After backward")
+
                     clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                     self.match_optimizer.step()
 
@@ -553,12 +602,20 @@ class PPOADAlgorithm(BaseAlgorithm):
                     pi_dist_epoch += pi_dist.item()
                     vf_dist_epoch += vf_dist.item()
                     match_nupdate += 1
+                    print("[DEBUG] Match batch done")
 
                 # Get pred data loader
+                print("[DEBUG] Starting aux pred ")
                 pred_data_loader = self.buffer.get_pred_data_loader()
+                print("[DEBUG] Finish aux pred ")
+
+                pred_batches = list(pred_data_loader)
+                print(f"[DEBUG] Pred dataloader contains {len(pred_batches)} batches")
 
                 batch = loss = pred_losses = None
+                # for idx, batch in enumerate(match_batches):
                 for batch in pred_data_loader:
+                    print("[DEBUG] PRED batch START")
                     batch = {k: v.to(self.model.device) for k, v in batch.items()}
                     # Now you can safely use it on the model
 
@@ -590,6 +647,7 @@ class PPOADAlgorithm(BaseAlgorithm):
                     pi_dist_epoch += pi_dist.item()
                     vf_dist_epoch += vf_dist.item()
                     pred_nupdate += 1
+                    print("[DEBUG] PRED batch DONE")
 
             # Compute average stats
             match_loss_epoch /= match_nupdate
@@ -606,7 +664,11 @@ class PPOADAlgorithm(BaseAlgorithm):
             }
 
             # Update train stats
+            print("[DEBUG] UPDATE START")
             train_stats.update(aux_train_stats)
+            print("[DEBUG] UPDATE DONE")
+
+            print(f"[DEBUG] AUX phase complete in {time.time() - t1:.2f}s")
 
         return train_stats
     
